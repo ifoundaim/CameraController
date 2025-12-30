@@ -53,7 +53,13 @@ final class DeviceMonitor {
 
     func updateDevice(_ captureDevice: CaptureDevice?) {
         lastDevice = captureDevice
-        recreateTimers()
+        // Start timers only when a controller exists to avoid hammering on startup.
+        if captureDevice?.controller != nil {
+            recreateTimers()
+        } else {
+            readTimer?.invalidate()
+            writeTimer?.invalidate()
+        }
     }
 
     @objc

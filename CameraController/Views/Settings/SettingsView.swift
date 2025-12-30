@@ -27,7 +27,16 @@ struct SettingsView: View {
             EmptyView()
         } else if currentSection == 3 {
             PreferencesView()
-        } else if let controller = captureDevice?.controller {
+        } else {
+            contentWithController()
+        }
+    }
+
+    @ViewBuilder
+    private func contentWithController() -> some View {
+        let _ = captureDevice?.ensureControllerLoaded()
+
+        if let controller = captureDevice?.controller {
             if currentSection == 0 {
                 BasicSettings(controller: controller)
             } else if currentSection == 1 {
@@ -36,7 +45,10 @@ struct SettingsView: View {
                 ProfilesView()
             }
         } else {
-            UnsupportedView()
+            VStack {
+                ProgressView("Loading device…")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

@@ -14,14 +14,8 @@ import UVC
 final class CaptureDevice: Hashable, ObservableObject {
     let name: String
     let avDevice: AVCaptureDevice?
-    lazy var uvcDevice: UVCDevice? = {
-        guard let avDevice else { return nil }
-        return try? UVCDevice(device: avDevice)
-    }()
-    lazy var controller: DeviceController? = {
-        guard let properties = uvcDevice?.properties else { return nil }
-        return DeviceController(properties: properties)
-    }()
+    @Published var controller: DeviceController?
+    private var controllerTask: Task<Void, Never>?
 
     init(avDevice: AVCaptureDevice) {
         self.avDevice = avDevice
@@ -37,7 +31,7 @@ final class CaptureDevice: Hashable, ObservableObject {
     }
 
     func isConfigurable() -> Bool {
-        return uvcDevice != nil
+        return controller != nil
     }
 
     func isDefaultDevice() -> Bool {
@@ -63,6 +57,22 @@ final class CaptureDevice: Hashable, ObservableObject {
 
         Task {
             controller.writeValues()
+        }
+    }
+
+    /// Lazily and asynchronously constructs the controller off the main thread.
+    func ensureControllerLoaded() {
+        guard controller == nil,
+              controllerTask == nil,
+              let avDevice else { return }
+
+        controllerTask = Task.detached(priority: .userInitiated) { [weak self] in
+            let uvc = try? UVCDevice(device: avDevice)
+            let dc = DeviceController(properties: uvc?.properties)
+            await MainActor.run { [weak self] in
+                self?.controller = dc
+                self?.controllerTask = nil
+            }
         }
     }
 }
