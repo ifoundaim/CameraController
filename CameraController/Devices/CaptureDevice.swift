@@ -108,6 +108,28 @@ final class CaptureDevice: Hashable, ObservableObject {
                     "runId": "run6",
                     "hypothesisId": "H1",
                     "location": "CaptureDevice.swift:ensureControllerLoaded",
+                    "message": "before mainactor run",
+                    "data": [
+                        "deviceName": self.name
+                    ],
+                    "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+                ])
+                if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
+                   let fh = fopen(path, "a") {
+                    logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
+                    _ = fwrite("\n", 1, 1, fh)
+                    fclose(fh)
+                }
+            } catch {}
+            // #endregion
+
+            // #region agent log
+            do {
+                let logLine = try JSONSerialization.data(withJSONObject: [
+                    "sessionId": "debug-session",
+                    "runId": "run6",
+                    "hypothesisId": "H1",
+                    "location": "CaptureDevice.swift:ensureControllerLoaded",
                     "message": "attempt uvc init",
                     "data": [
                         "deviceName": self.name
