@@ -80,7 +80,7 @@ final class CaptureDevice: Hashable, ObservableObject {
         do {
             let logLine = try JSONSerialization.data(withJSONObject: [
                 "sessionId": "debug-session",
-                "runId": "run4",
+                "runId": "run5",
                 "hypothesisId": "H1",
                 "location": "CaptureDevice.swift:ensureControllerLoaded",
                 "message": "start load",
@@ -98,22 +98,19 @@ final class CaptureDevice: Hashable, ObservableObject {
         } catch {}
         // #endregion
 
-        controllerTask = Task.detached(priority: .userInitiated) { [weak self] in
-            var hasUVC = false
-            var dc: DeviceController?
-            var errorMsg: String?
-            let deviceName = self?.name ?? ""
+        controllerTask = Task { [weak self] in
+            guard let self else { return }
 
             // #region agent log
             do {
                 let logLine = try JSONSerialization.data(withJSONObject: [
                     "sessionId": "debug-session",
-                    "runId": "run4",
+                    "runId": "run5",
                     "hypothesisId": "H1",
                     "location": "CaptureDevice.swift:ensureControllerLoaded",
                     "message": "attempt uvc init",
                     "data": [
-                        "deviceName": deviceName
+                        "deviceName": self.name
                     ],
                     "timestamp": Int(Date().timeIntervalSince1970 * 1000)
                 ])
@@ -126,20 +123,27 @@ final class CaptureDevice: Hashable, ObservableObject {
             } catch {}
             // #endregion
 
+            var hasUVC = false
+            var dc: DeviceController?
+            var errorMsg: String?
+
             do {
-                let uvc = try? UVCDevice(device: avDevice)
-                hasUVC = uvc != nil
-                dc = DeviceController(properties: uvc?.properties)
+                // Create UVC and controller on MainActor to avoid cross-thread issues.
+                try await MainActor.run {
+                    let uvc = try? UVCDevice(device: avDevice)
+                    hasUVC = uvc != nil
+                    dc = DeviceController(properties: uvc?.properties)
+                }
             } catch {
                 errorMsg = "\(error)"
             }
 
-            await MainActor.run { [weak self] in
+            await MainActor.run {
                 // #region agent log
                 do {
                     let logLine = try JSONSerialization.data(withJSONObject: [
                         "sessionId": "debug-session",
-                        "runId": "run4",
+                        "runId": "run5",
                         "hypothesisId": "H1",
                         "location": "CaptureDevice.swift:ensureControllerLoaded",
                         "message": "controller creation result",
@@ -147,7 +151,7 @@ final class CaptureDevice: Hashable, ObservableObject {
                             "hasDC": dc != nil,
                             "hasUVC": hasUVC,
                             "error": errorMsg as Any,
-                            "deviceName": self?.name ?? ""
+                            "deviceName": self.name
                         ],
                         "timestamp": Int(Date().timeIntervalSince1970 * 1000)
                     ])
@@ -163,12 +167,12 @@ final class CaptureDevice: Hashable, ObservableObject {
                 } catch {}
                 // #endregion
                 if let dc {
-                    self?.controller = dc
-                    self?.controllerState = .loaded
+                    self.controller = dc
+                    self.controllerState = .loaded
                 } else {
-                    self?.controllerState = .failed(errorMsg ?? "Unable to initialize camera controls.")
+                    self.controllerState = .failed(errorMsg ?? "Unable to initialize camera controls.")
                 }
-                self?.controllerTask = nil
+                self.controllerTask = nil
             }
         }
     }
