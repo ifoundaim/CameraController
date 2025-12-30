@@ -14,14 +14,18 @@ import UVC
 final class CaptureDevice: Hashable, ObservableObject {
     let name: String
     let avDevice: AVCaptureDevice?
-    let uvcDevice: UVCDevice?
-    var controller: DeviceController?
+    lazy var uvcDevice: UVCDevice? = {
+        guard let avDevice else { return nil }
+        return try? UVCDevice(device: avDevice)
+    }()
+    lazy var controller: DeviceController? = {
+        guard let properties = uvcDevice?.properties else { return nil }
+        return DeviceController(properties: properties)
+    }()
 
     init(avDevice: AVCaptureDevice) {
         self.avDevice = avDevice
         self.name = avDevice.localizedName
-        self.uvcDevice = try? UVCDevice(device: avDevice)
-        self.controller = DeviceController(properties: uvcDevice?.properties)
     }
 
     static func == (lhs: CaptureDevice, rhs: CaptureDevice) -> Bool {
