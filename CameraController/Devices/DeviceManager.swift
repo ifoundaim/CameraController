@@ -34,10 +34,11 @@ final class DevicesManager: ObservableObject {
             CaptureDevice(avDevice: device)
         })
 
-        if let deviceId = UserSettings.shared.lastSelectedDevice {
-            selectedDevice = devices.first { (device) -> Bool in
-                device.avDevice?.uniqueID == deviceId
-            }
+        if let deviceId = UserSettings.shared.lastSelectedDevice,
+           let saved = devices.first(where: { $0.avDevice?.uniqueID == deviceId }) {
+            selectedDevice = saved
+        } else {
+            selectedDevice = devices.first
         }
     }
 

@@ -28,6 +28,9 @@ struct ContentView: View {
                 settingsView()
             }.onAppear {
                 DevicesManager.shared.startMonitoring()
+                if manager.selectedDevice == nil {
+                    manager.selectedDevice = manager.devices.first
+                }
             }.onDisappear {
                 DevicesManager.shared.stopMonitoring()
             }
