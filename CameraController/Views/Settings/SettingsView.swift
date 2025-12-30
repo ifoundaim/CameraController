@@ -40,7 +40,7 @@ struct SettingsView: View {
             // #region agent log
             let _ = {
                 do {
-                    let logLine = try JSONSerialization.data(withJSONObject: [
+                    let payload: [String: Any] = [
                         "sessionId": "debug-session",
                         "runId": "run8",
                         "hypothesisId": "H1",
@@ -51,7 +51,24 @@ struct SettingsView: View {
                             "state": "\(device.controllerState)"
                         ],
                         "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                    ])
+                    ]
+
+                    guard JSONSerialization.isValidJSONObject(payload) else {
+                        if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
+                           let fh = fopen(path, "a") {
+                            let fallback = """
+{"sessionId":"debug-session","runId":"run8","hypothesisId":"H1","location":"SettingsView.swift:contentWithController","message":"invalid json payload","data":{"currentSectionType":"\(String(describing: type(of: currentSection)))"},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
+"""
+                            fallback.withCString { ptr in
+                                _ = fwrite(ptr, 1, strlen(ptr), fh)
+                                _ = fwrite("\n", 1, 1, fh)
+                            }
+                            fclose(fh)
+                        }
+                        return 0
+                    }
+
+                    let logLine = try JSONSerialization.data(withJSONObject: payload)
                     if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
                        let fh = fopen(path, "a") {
                         logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
@@ -109,7 +126,7 @@ struct SettingsView: View {
             // #region agent log
             let _ = {
                 do {
-                    let logLine = try JSONSerialization.data(withJSONObject: [
+                    let payload: [String: Any] = [
                         "sessionId": "debug-session",
                         "runId": "run8",
                         "hypothesisId": "H1",
@@ -120,7 +137,24 @@ struct SettingsView: View {
                             "deviceState": "\(captureDevice?.controllerState ?? .idle)"
                         ],
                         "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                    ])
+                    ]
+
+                    guard JSONSerialization.isValidJSONObject(payload) else {
+                        if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
+                           let fh = fopen(path, "a") {
+                            let fallback = """
+{"sessionId":"debug-session","runId":"run8","hypothesisId":"H1","location":"SettingsView.swift:loadingView","message":"invalid json payload","data":{"textType":"\(String(describing: type(of: text)))","deviceStateType":"\(String(describing: type(of: captureDevice?.controllerState)))"},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
+"""
+                            fallback.withCString { ptr in
+                                _ = fwrite(ptr, 1, strlen(ptr), fh)
+                                _ = fwrite("\n", 1, 1, fh)
+                            }
+                            fclose(fh)
+                        }
+                        return 0
+                    }
+
+                    let logLine = try JSONSerialization.data(withJSONObject: payload)
                     if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8) {
                         if let fh = fopen(path, "a") {
                             logLine.withUnsafeBytes { ptr in
