@@ -80,7 +80,7 @@ final class CaptureDevice: Hashable, ObservableObject {
         do {
             let logLine = try JSONSerialization.data(withJSONObject: [
                 "sessionId": "debug-session",
-                "runId": "run2",
+                "runId": "run4",
                 "hypothesisId": "H1",
                 "location": "CaptureDevice.swift:ensureControllerLoaded",
                 "message": "start load",
@@ -102,17 +102,18 @@ final class CaptureDevice: Hashable, ObservableObject {
             var hasUVC = false
             var dc: DeviceController?
             var errorMsg: String?
+            let deviceName = self?.name ?? ""
 
             // #region agent log
             do {
                 let logLine = try JSONSerialization.data(withJSONObject: [
                     "sessionId": "debug-session",
-                    "runId": "run3",
+                    "runId": "run4",
                     "hypothesisId": "H1",
                     "location": "CaptureDevice.swift:ensureControllerLoaded",
                     "message": "attempt uvc init",
                     "data": [
-                        "deviceName": self?.name ?? ""
+                        "deviceName": deviceName
                     ],
                     "timestamp": Int(Date().timeIntervalSince1970 * 1000)
                 ])
@@ -138,7 +139,7 @@ final class CaptureDevice: Hashable, ObservableObject {
                 do {
                     let logLine = try JSONSerialization.data(withJSONObject: [
                         "sessionId": "debug-session",
-                        "runId": "run3",
+                        "runId": "run4",
                         "hypothesisId": "H1",
                         "location": "CaptureDevice.swift:ensureControllerLoaded",
                         "message": "controller creation result",
