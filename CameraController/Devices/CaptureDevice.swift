@@ -11,6 +11,9 @@ import AVFoundation
 import Combine
 import UVC
 
+@_silgen_name("CCObjCTryCatch")
+func CCObjCTryCatch(_ block: @escaping @convention(block) () -> AnyObject?, _ errorOut: UnsafeMutablePointer<NSString?>?) -> AnyObject?
+
 final class CaptureDevice: Hashable, ObservableObject {
     let name: String
     let avDevice: AVCaptureDevice?
@@ -174,12 +177,16 @@ final class CaptureDevice: Hashable, ObservableObject {
                     } catch {}
                     // #endregion
 
-                    // UVC init
-                    let uvc: UVCDevice?
-                    do {
-                        uvc = try? UVCDevice(device: avDevice)
-                        hasUVC = uvc != nil
+                    // UVC init with ObjC exception guard
+                    var objcError: NSString?
+                    let uvcAny = CCObjCTryCatch({
+                        return (try? UVCDevice(device: avDevice)) as AnyObject?
+                    }, &objcError)
+                    let uvc = uvcAny as? UVCDevice
+                    if let objcError {
+                        errorMsg = "NSException: \(objcError)"
                     }
+                    hasUVC = uvc != nil
 
                     // #region agent log
                     do {
@@ -191,7 +198,8 @@ final class CaptureDevice: Hashable, ObservableObject {
                             "message": "after uvc init",
                             "data": [
                                 "deviceName": self.name,
-                                "hasUVC": hasUVC
+                                "hasUVC": hasUVC,
+                                "objcError": objcError as Any
                             ],
                             "timestamp": Int(Date().timeIntervalSince1970 * 1000)
                         ])
@@ -205,7 +213,7 @@ final class CaptureDevice: Hashable, ObservableObject {
                     // #endregion
 
                     guard hasUVC else {
-                        self.controllerState = .failed("UVC init returned nil device.")
+                        self.controllerState = .failed(errorMsg ?? "UVC init returned nil device.")
                         return
                     }
 
