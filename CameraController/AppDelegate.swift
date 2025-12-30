@@ -25,6 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         LetsMove.shared.moveToApplicationsFolderIfNecessary()
 
+        WindowManager.shared.showWindow()
+
         if UserSettings.shared.checkForUpdatesOnStartup {
             checkForUpdates()
         }
@@ -32,6 +34,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        WindowManager.shared.showWindow()
+        return true
     }
 
     // MARK: - Check For Updates
