@@ -42,6 +42,7 @@ jobs:
           -scheme CameraController \
           -configuration Release \
           -destination "platform=macOS" \
+          CONFIGURATION_BUILD_DIR=$PWD/build/Release \
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
           build
