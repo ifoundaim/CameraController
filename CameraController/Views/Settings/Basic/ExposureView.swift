@@ -42,27 +42,30 @@ struct ExposureView: View {
 
             HStack {
                 Toggle(isOn: auto.animation())
-                Slider(value: $exposureTime.sliderValue,
-                          step: exposureTime.resolution,
-                          sliderRange: exposureTime.minimum...exposureTime.maximum)
-                    .disabled(auto.wrappedValue)
+                NumericSliderRow(value: $exposureTime.sliderValue,
+                                 step: exposureTime.resolution,
+                                 range: exposureTime.minimum...exposureTime.maximum,
+                                 isDisabled: auto.wrappedValue) {
+                    Toggle(isOn: auto.animation())
+                }
             }
 
             if !auto.wrappedValue {
                 HStack {
                     Toggle(isOn: .constant(false))
                         .hidden()
-                    VStack {
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Gain")
                                 .fontWeight(.heavy)
                             Spacer()
                         }
-                        HStack {
-                            Slider(value: $gain.sliderValue,
-                                      step: gain.resolution,
-                                      sliderRange: gain.minimum...gain.maximum)
-                            .disabled(auto.wrappedValue)
+                        NumericSliderRow(value: $gain.sliderValue,
+                                         step: gain.resolution,
+                                         range: gain.minimum...gain.maximum,
+                                         isDisabled: auto.wrappedValue) {
+                            Toggle(isOn: .constant(false))
+                                .hidden()
                         }
                     }
                 }

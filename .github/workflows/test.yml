@@ -15,11 +15,13 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@master
-    - name: Install Certificates
-      uses: apple-actions/import-codesign-certs@v1
-      with: 
-        p12-file-base64: ${{ secrets.CERTIFICATES_P12 }}
-        p12-password: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
+      uses: actions/checkout@v4
     - name: Test
-      run: xcodebuild -project CameraController.xcodeproj -scheme CameraController -sdk macosx test
+      run: |
+        xcodebuild \
+          -project CameraController.xcodeproj \
+          -scheme CameraController \
+          -destination "platform=macOS" \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGN_IDENTITY="" \
+          build test

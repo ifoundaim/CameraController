@@ -75,7 +75,9 @@ struct Slider: View {
                             1
                         )
                         let tmpValue = percentageToValueInRange(percentage, sliderRange)
-                        self.value = tmpValue - tmpValue.truncatingRemainder(dividingBy: step)
+                        self.value = NumericSliderValue.sanitize(tmpValue,
+                                                                 step: step,
+                                                                 range: sliderRange)
                     }
             )
             .allowsHitTesting(self.isEnabled)

@@ -20,24 +20,22 @@ struct PanTiltView: View {
             SectionView {
                 SectionTitle(title: "Tilt",
                              image: Image(systemName: "arrow.up.and.down"))
-                HStack {
+                NumericSliderRow(value: $panTiltAbsolute.sliderValue1,
+                                 step: panTiltAbsolute.resolution1,
+                                 range: panTiltAbsolute.minimum1...panTiltAbsolute.maximum1) {
                     Toggle(isOn: .constant(false))
                         .hidden()
-                    Slider(value: $panTiltAbsolute.sliderValue1,
-                              step: panTiltAbsolute.resolution1,
-                              sliderRange: panTiltAbsolute.minimum1...panTiltAbsolute.maximum1)
                 }
             }
 
             SectionView {
                 SectionTitle(title: "Pan",
                              image: Image(systemName: "arrow.left.and.right"))
-                HStack {
+                NumericSliderRow(value: $panTiltAbsolute.sliderValue2,
+                                 step: panTiltAbsolute.resolution2,
+                                 range: panTiltAbsolute.minimum2...panTiltAbsolute.maximum2) {
                     Toggle(isOn: .constant(false))
                         .hidden()
-                    Slider(value: $panTiltAbsolute.sliderValue2,
-                              step: panTiltAbsolute.resolution2,
-                              sliderRange: panTiltAbsolute.minimum2...panTiltAbsolute.maximum2)
                 }
             }
         }

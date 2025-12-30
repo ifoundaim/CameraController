@@ -47,17 +47,16 @@ struct GenericControl: View {
                 }
             }
 
-            HStack {
+            NumericSliderRow(value: $value,
+                             step: step,
+                             range: range,
+                             isDisabled: $auto.wrappedValue) {
                 if hasAuto {
                     Toggle(isOn: $auto.animation())
                 } else {
                     Toggle(isOn: .constant(false))
                         .hidden()
                 }
-                Slider(value: $value,
-                          step: step,
-                          sliderRange: range)
-                    .disabled($auto.wrappedValue)
             }
         }
     }
