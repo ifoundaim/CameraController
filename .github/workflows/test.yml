@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - master
+  workflow_dispatch:
 
 jobs:
   test:
@@ -25,3 +26,37 @@ jobs:
           CODE_SIGNING_ALLOWED=NO \
           CODE_SIGN_IDENTITY="" \
           build test
+
+  build-artifact:
+    name: Build unsigned app artifact
+    runs-on: macOS-latest
+    needs: test
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Build (Release, unsigned)
+      run: |
+        xcodebuild \
+          -project CameraController.xcodeproj \
+          -scheme CameraController \
+          -configuration Release \
+          -destination "platform=macOS" \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGN_IDENTITY="" \
+          build
+    - name: Package app
+      run: |
+        APP_PATH="build/Release/CameraController.app"
+        ZIP_PATH="build/CameraController-Release.zip"
+        if [ ! -d "$APP_PATH" ]; then
+          echo "App not found at $APP_PATH"
+          exit 1
+        fi
+        ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CameraController-macOS-unsigned
+        path: build/CameraController-Release.zip
+        if-no-files-found: error
