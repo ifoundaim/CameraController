@@ -199,7 +199,7 @@ final class CaptureDevice: Hashable, ObservableObject {
                             "data": [
                                 "deviceName": self.name,
                                 "hasUVC": hasUVC,
-                                "objcError": objcError as Any
+                                "objcError": objcError as String? ?? ""
                             ],
                             "timestamp": Int(Date().timeIntervalSince1970 * 1000)
                         ])

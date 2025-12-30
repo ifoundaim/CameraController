@@ -117,7 +117,7 @@ struct SettingsView: View {
                         "message": "showing loading view",
                         "data": [
                             "text": text,
-                            "deviceState": captureDevice?.controllerState as Any
+                            "deviceState": "\(captureDevice?.controllerState ?? .idle)"
                         ],
                         "timestamp": Int(Date().timeIntervalSince1970 * 1000)
                     ])
