@@ -80,7 +80,7 @@ final class CaptureDevice: Hashable, ObservableObject {
         do {
             let logLine = try JSONSerialization.data(withJSONObject: [
                 "sessionId": "debug-session",
-                "runId": "run7",
+                "runId": "run8",
                 "hypothesisId": "H1",
                 "location": "CaptureDevice.swift:ensureControllerLoaded",
                 "message": "start load",
@@ -105,7 +105,7 @@ final class CaptureDevice: Hashable, ObservableObject {
             do {
                 let logLine = try JSONSerialization.data(withJSONObject: [
                     "sessionId": "debug-session",
-                    "runId": "run7",
+                    "runId": "run8",
                     "hypothesisId": "H1",
                     "location": "CaptureDevice.swift:ensureControllerLoaded",
                     "message": "before mainactor run",
@@ -127,7 +127,7 @@ final class CaptureDevice: Hashable, ObservableObject {
             do {
                 let logLine = try JSONSerialization.data(withJSONObject: [
                     "sessionId": "debug-session",
-                    "runId": "run7",
+                    "runId": "run8",
                     "hypothesisId": "H1",
                     "location": "CaptureDevice.swift:ensureControllerLoaded",
                     "message": "attempt uvc init (background)",
@@ -156,10 +156,10 @@ final class CaptureDevice: Hashable, ObservableObject {
                     do {
                         let logLine = try JSONSerialization.data(withJSONObject: [
                             "sessionId": "debug-session",
-                            "runId": "run7",
+                            "runId": "run8",
                             "hypothesisId": "H1",
                             "location": "CaptureDevice.swift:ensureControllerLoaded",
-                            "message": "before uvc init (main actor)",
+                            "message": "enter main actor before uvc init",
                             "data": [
                                 "deviceName": self.name
                             ],
@@ -174,14 +174,18 @@ final class CaptureDevice: Hashable, ObservableObject {
                     } catch {}
                     // #endregion
 
-                    let uvc = try? UVCDevice(device: avDevice)
-                    hasUVC = uvc != nil
+                    // UVC init
+                    let uvc: UVCDevice?
+                    do {
+                        uvc = try? UVCDevice(device: avDevice)
+                        hasUVC = uvc != nil
+                    }
 
                     // #region agent log
                     do {
                         let logLine = try JSONSerialization.data(withJSONObject: [
                             "sessionId": "debug-session",
-                            "runId": "run7",
+                            "runId": "run8",
                             "hypothesisId": "H1",
                             "location": "CaptureDevice.swift:ensureControllerLoaded",
                             "message": "after uvc init",
@@ -200,13 +204,19 @@ final class CaptureDevice: Hashable, ObservableObject {
                     } catch {}
                     // #endregion
 
+                    guard hasUVC else {
+                        self.controllerState = .failed("UVC init returned nil device.")
+                        return
+                    }
+
+                    // DeviceController init
                     dc = DeviceController(properties: uvc?.properties)
 
                     // #region agent log
                     do {
                         let logLine = try JSONSerialization.data(withJSONObject: [
                             "sessionId": "debug-session",
-                            "runId": "run7",
+                            "runId": "run8",
                             "hypothesisId": "H1",
                             "location": "CaptureDevice.swift:ensureControllerLoaded",
                             "message": "after dc init",
@@ -234,7 +244,7 @@ final class CaptureDevice: Hashable, ObservableObject {
                 do {
                     let logLine = try JSONSerialization.data(withJSONObject: [
                         "sessionId": "debug-session",
-                        "runId": "run7",
+                        "runId": "run8",
                         "hypothesisId": "H1",
                         "location": "CaptureDevice.swift:ensureControllerLoaded",
                         "message": "controller creation result",
