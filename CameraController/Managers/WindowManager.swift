@@ -13,55 +13,47 @@ import SwiftUI
 class WindowManager: NSObject {
     static let shared = WindowManager()
 
-    private var popover: NSPopover?
-    private var isShowing: Bool = false
+    private var window: NSWindow?
 
     func toggleShowWindow(from button: NSButton) {
-        if isShowing {
-            closeWindow()
-        } else {
-            showWindow(from: button)
-        }
+        isWindowVisible ? closeWindow() : showWindow()
     }
 
-    func showWindow(from button: NSButton) {
+    private var isWindowVisible: Bool {
+        guard let window else { return false }
+        return window.isVisible && window.isKeyWindow
+    }
+
+    func showWindow() {
         NotificationCenter.default.post(name: .windowOpen, object: nil)
 
-        let contentView = ContentView()
+        if window == nil {
+            let contentView = ContentView()
+            let hosting = NSHostingController(rootView: contentView)
 
-        popover = NSPopover()
-        popover?.contentViewController = NSHostingController(rootView: contentView)
-        popover?.contentSize.width = UserSettings.shared.cameraPreviewSize.getWidth()
-        popover?.contentSize.height = 100
-        popover?.behavior = .transient
-        popover?.delegate = self
-        DispatchQueue.main.async { [weak self] in
-            self?.popover?.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            self?.popover?.contentViewController?.view.window?.makeKey()
+            let size = NSSize(width: 760,
+                              height: 520)
+            let newWindow = NSWindow(
+                contentRect: NSRect(origin: .zero, size: size),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            newWindow.contentViewController = hosting
+            newWindow.center()
+            newWindow.title = "Camera Controller"
+            newWindow.isReleasedWhenClosed = false
+
+            window = newWindow
         }
 
-        isShowing = true
+        guard let window else { return }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func closeWindow() {
-        isShowing = false
-
-        popover?.performClose(nil)
-    }
-}
-
-extension WindowManager: NSPopoverDelegate {
-    func popoverShouldDetach(_ popover: NSPopover) -> Bool {
-        return true
-    }
-
-    func popoverWillClose(_ notification: Notification) {
+        window?.orderOut(nil)
         NotificationCenter.default.post(name: .windowClose, object: nil)
-        isShowing = false
-    }
-
-    func popoverDidDetach(_ popover: NSPopover) {
-        // Disable dragging, only dragging with the preview is allowed
-        popover.contentViewController?.view.window?.isMovableByWindowBackground = false
     }
 }

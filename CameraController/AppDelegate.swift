@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        NSApp.setActivationPolicy(.regular)
         LetsMove.shared.moveToApplicationsFolderIfNecessary()
 
         if UserSettings.shared.checkForUpdatesOnStartup {
