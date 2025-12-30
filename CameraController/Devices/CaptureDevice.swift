@@ -15,7 +15,15 @@ final class CaptureDevice: Hashable, ObservableObject {
     let name: String
     let avDevice: AVCaptureDevice?
     @Published var controller: DeviceController?
+    @Published var controllerState: ControllerState = .idle
     private var controllerTask: Task<Void, Never>?
+
+    enum ControllerState {
+        case idle
+        case loading
+        case loaded
+        case failed(String?)
+    }
 
     init(avDevice: AVCaptureDevice) {
         self.avDevice = avDevice
@@ -66,11 +74,18 @@ final class CaptureDevice: Hashable, ObservableObject {
               controllerTask == nil,
               let avDevice else { return }
 
+        controllerState = .loading
+
         controllerTask = Task.detached(priority: .userInitiated) { [weak self] in
             let uvc = try? UVCDevice(device: avDevice)
             let dc = DeviceController(properties: uvc?.properties)
             await MainActor.run { [weak self] in
-                self?.controller = dc
+                if let dc {
+                    self?.controller = dc
+                    self?.controllerState = .loaded
+                } else {
+                    self?.controllerState = .failed("Unable to initialize camera controls.")
+                }
                 self?.controllerTask = nil
             }
         }

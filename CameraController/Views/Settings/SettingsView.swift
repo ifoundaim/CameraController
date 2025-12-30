@@ -36,20 +36,53 @@ struct SettingsView: View {
     private func contentWithController() -> some View {
         let _ = captureDevice?.ensureControllerLoaded()
 
-        if let controller = captureDevice?.controller {
-            if currentSection == 0 {
-                BasicSettings(controller: controller)
-            } else if currentSection == 1 {
-                AdvancedView(controller: controller)
-            } else if currentSection == 2 {
-                ProfilesView()
+        if let device = captureDevice {
+            switch device.controllerState {
+            case .loaded:
+                if let controller = device.controller {
+                    if currentSection == 0 {
+                        BasicSettings(controller: controller)
+                    } else if currentSection == 1 {
+                        AdvancedView(controller: controller)
+                    } else if currentSection == 2 {
+                        ProfilesView()
+                    }
+                } else {
+                    loadingView(text: "Loading device…")
+                }
+            case .loading, .idle:
+                loadingView(text: "Loading device…")
+            case .failed(let message):
+                VStack(spacing: 12) {
+                    Text("Unable to load camera controls.")
+                        .font(.headline)
+                    if let message, !message.isEmpty {
+                        Text(message)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    Text("Try reconnecting the camera or selecting a different device.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else {
-            VStack {
-                ProgressView("Loading device…")
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            loadingView(text: "No camera selected.")
         }
+    }
+
+    @ViewBuilder
+    private func loadingView(text: String) -> some View {
+        VStack(spacing: 8) {
+            ProgressView()
+            Text(text)
+                .font(.footnote)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
