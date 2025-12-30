@@ -42,7 +42,7 @@ struct SettingsView: View {
                 do {
                     let logLine = try JSONSerialization.data(withJSONObject: [
                         "sessionId": "debug-session",
-                        "runId": "run5",
+                        "runId": "run6",
                         "hypothesisId": "H1",
                         "location": "SettingsView.swift:contentWithController",
                         "message": "render contentWithController",
@@ -111,7 +111,7 @@ struct SettingsView: View {
                 do {
                     let logLine = try JSONSerialization.data(withJSONObject: [
                         "sessionId": "debug-session",
-                        "runId": "run5",
+                        "runId": "run6",
                         "hypothesisId": "H1",
                         "location": "SettingsView.swift:loadingView",
                         "message": "showing loading view",
