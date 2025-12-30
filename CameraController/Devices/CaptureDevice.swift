@@ -76,21 +76,49 @@ final class CaptureDevice: Hashable, ObservableObject {
 
         controllerState = .loading
 
+        // #region agent log
+        do {
+            let logLine = try JSONSerialization.data(withJSONObject: [
+                "sessionId": "debug-session",
+                "runId": "run2",
+                "hypothesisId": "H1",
+                "location": "CaptureDevice.swift:ensureControllerLoaded",
+                "message": "start load",
+                "data": [
+                    "deviceName": name
+                ],
+                "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+            ])
+            if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
+               let fh = fopen(path, "a") {
+                logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
+                _ = fwrite("\n", 1, 1, fh)
+                fclose(fh)
+            }
+        } catch {}
+        // #endregion
+
         controllerTask = Task.detached(priority: .userInitiated) { [weak self] in
-            let uvc = try? UVCDevice(device: avDevice)
-            let dc = DeviceController(properties: uvc?.properties)
+            var hasUVC = false
+            var dc: DeviceController?
+            do {
+                let uvc = try? UVCDevice(device: avDevice)
+                hasUVC = uvc != nil
+                dc = DeviceController(properties: uvc?.properties)
+            }
+
             await MainActor.run { [weak self] in
                 // #region agent log
                 do {
                     let logLine = try JSONSerialization.data(withJSONObject: [
                         "sessionId": "debug-session",
-                        "runId": "run1",
+                        "runId": "run2",
                         "hypothesisId": "H1",
                         "location": "CaptureDevice.swift:ensureControllerLoaded",
                         "message": "controller creation result",
                         "data": [
                             "hasDC": dc != nil,
-                            "hasUVC": uvc != nil,
+                            "hasUVC": hasUVC,
                             "deviceName": self?.name ?? ""
                         ],
                         "timestamp": Int(Date().timeIntervalSince1970 * 1000)

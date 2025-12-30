@@ -37,6 +37,31 @@ struct SettingsView: View {
         let _ = captureDevice?.ensureControllerLoaded()
 
         if let device = captureDevice {
+            // #region agent log
+            let _ = {
+                do {
+                    let logLine = try JSONSerialization.data(withJSONObject: [
+                        "sessionId": "debug-session",
+                        "runId": "run2",
+                        "hypothesisId": "H1",
+                        "location": "SettingsView.swift:contentWithController",
+                        "message": "render contentWithController",
+                        "data": [
+                            "currentSection": currentSection as Any,
+                            "state": "\(device.controllerState)"
+                        ],
+                        "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+                    ])
+                    if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
+                       let fh = fopen(path, "a") {
+                        logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
+                        _ = fwrite("\n", 1, 1, fh)
+                        fclose(fh)
+                    }
+                } catch {}
+                return 0
+            }()
+            // #endregion
             switch device.controllerState {
             case .loaded:
                 if let controller = device.controller {
