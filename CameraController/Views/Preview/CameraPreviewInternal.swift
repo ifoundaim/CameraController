@@ -44,6 +44,14 @@ final class CameraPreviewInternal: NSView {
                                                selector: #selector(windowOpen),
                                                name: .windowOpen,
                                                object: nil)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(pausePreview),
+                                               name: .pausePreview,
+                                               object: nil)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(resumePreview),
+                                               name: .resumePreview,
+                                               object: nil)
     }
 
     private func setupPreviewLayer(_ captureSession: AVCaptureSession) {
@@ -127,6 +135,18 @@ final class CameraPreviewInternal: NSView {
 
     @objc
     func windowOpen() {
+        if !captureSession.isRunning {
+            captureSession.startRunning()
+        }
+    }
+
+    @objc
+    func pausePreview() {
+        stopRunning()
+    }
+
+    @objc
+    func resumePreview() {
         if !captureSession.isRunning {
             captureSession.startRunning()
         }

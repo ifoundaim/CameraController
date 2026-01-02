@@ -203,6 +203,9 @@ final class CaptureDevice: Hashable, ObservableObject {
                 ]
             )
 
+            // Pause preview to test if UVC init blocks when streaming is active.
+            NotificationCenter.default.post(name: .pausePreview, object: nil)
+
             let outcome: UVCInitOutcome = await withTaskGroup(of: UVCInitOutcome.self) { group in
                 // UVC init attempt
                 group.addTask {
@@ -304,6 +307,8 @@ final class CaptureDevice: Hashable, ObservableObject {
                         ]
                     )
                 }
+
+                NotificationCenter.default.post(name: .resumePreview, object: nil)
 
                 self.appendDebugLog(
                     hypothesisId: "H1",
