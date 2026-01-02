@@ -96,18 +96,38 @@ final class CaptureDevice: Hashable, ObservableObject {
     /// Lazily and asynchronously constructs the controller off the main thread.
     @MainActor
     func ensureControllerLoaded() {
-        guard controller == nil,
-              controllerTask == nil,
-              let avDevice else {
+        guard controller == nil else {
             appendDebugLog(
                 hypothesisId: "H1",
                 location: "CaptureDevice.ensureControllerLoaded",
-                message: "early_return_guard_failed",
+                message: "early_return_controller_exists",
                 data: [
                     "uniqueID": uniqueID,
-                    "controllerNil": "\(controller == nil)",
-                    "taskNil": "\(controllerTask == nil)",
-                    "hasAV": "\(self.avDevice != nil)"
+                    "state": "\(controllerState)"
+                ]
+            )
+            return
+        }
+        guard controllerTask == nil else {
+            appendDebugLog(
+                hypothesisId: "H1",
+                location: "CaptureDevice.ensureControllerLoaded",
+                message: "early_return_task_inflight",
+                data: [
+                    "uniqueID": uniqueID,
+                    "state": "\(controllerState)"
+                ]
+            )
+            return
+        }
+        guard let avDevice else {
+            appendDebugLog(
+                hypothesisId: "H1",
+                location: "CaptureDevice.ensureControllerLoaded",
+                message: "early_return_no_avDevice",
+                data: [
+                    "uniqueID": uniqueID,
+                    "state": "\(controllerState)"
                 ]
             )
             return
@@ -157,9 +177,20 @@ final class CaptureDevice: Hashable, ObservableObject {
         controllerTask = Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
 
+            let startNs = DispatchTime.now().uptimeNanoseconds
             var dc: DeviceController?
             var errorMsg: String?
             autoreleasepool {
+                self.appendDebugLog(
+                    hypothesisId: "H1",
+                    location: "CaptureDevice.ensureControllerLoaded",
+                    message: "uvc_init_begin",
+                    data: [
+                        "uniqueID": self.uniqueID,
+                        "gen": "\(gen)"
+                    ]
+                )
+
                 var objcError: NSString?
                 let uvcAny = CCObjCTryCatch({
                     return (try? UVCDevice(device: avDevice)) as AnyObject?
@@ -177,6 +208,20 @@ final class CaptureDevice: Hashable, ObservableObject {
                 if dc == nil, errorMsg == nil {
                     errorMsg = "Unable to initialize camera controls."
                 }
+
+                let elapsedMs = (Double(DispatchTime.now().uptimeNanoseconds - startNs) / 1_000_000).formatted(.number.precision(.fractionLength(1)))
+                self.appendDebugLog(
+                    hypothesisId: "H1",
+                    location: "CaptureDevice.ensureControllerLoaded",
+                    message: "uvc_init_end",
+                    data: [
+                        "uniqueID": self.uniqueID,
+                        "gen": "\(gen)",
+                        "uvcNil": "\(dc == nil)",
+                        "error": errorMsg ?? "",
+                        "elapsedMs": "\(elapsedMs)"
+                    ]
+                )
             }
 
             let dcResult = dc
