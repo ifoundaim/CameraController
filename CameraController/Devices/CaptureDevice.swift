@@ -20,6 +20,7 @@ final class CaptureDevice: Hashable, ObservableObject {
     @Published var controller: DeviceController?
     @Published var controllerState: ControllerState = .idle
     private var controllerTask: Task<Void, Never>?
+    private var controllerLoadGeneration: UInt64 = 0
 
     enum ControllerState {
         case idle
@@ -72,214 +73,67 @@ final class CaptureDevice: Hashable, ObservableObject {
     }
 
     /// Lazily and asynchronously constructs the controller off the main thread.
+    @MainActor
     func ensureControllerLoaded() {
         guard controller == nil,
               controllerTask == nil,
               let avDevice else { return }
 
         controllerState = .loading
+        controllerLoadGeneration &+= 1
+        let gen = controllerLoadGeneration
 
-        // #region agent log
-        do {
-            let logLine = try JSONSerialization.data(withJSONObject: [
-                "sessionId": "debug-session",
-                "runId": "run8",
-                "hypothesisId": "H1",
-                "location": "CaptureDevice.swift:ensureControllerLoaded",
-                "message": "start load",
-                "data": [
-                    "deviceName": name
-                ],
-                "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-            ])
-            if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-               let fh = fopen(path, "a") {
-                logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
-                _ = fwrite("\n", 1, 1, fh)
-                fclose(fh)
+        // Watchdog: if UVC init blocks indefinitely, fail the UI after 3s.
+        Task.detached { [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await MainActor.run {
+                guard let self else { return }
+                guard self.controllerLoadGeneration == gen else { return }
+                guard self.controller == nil else { return }
+                guard case .loading = self.controllerState else { return }
+
+                self.controllerState = .failed("UVC init timed out (> 3s).")
+                // Invalidate this generation so any late completion is ignored.
+                self.controllerLoadGeneration &+= 1
+                self.controllerTask?.cancel()
+                self.controllerTask = nil
             }
-        } catch {}
-        // #endregion
+        }
 
-        controllerTask = Task { [weak self] in
+        controllerTask = Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
 
-            // #region agent log
-            do {
-                let logLine = try JSONSerialization.data(withJSONObject: [
-                    "sessionId": "debug-session",
-                    "runId": "run8",
-                    "hypothesisId": "H1",
-                    "location": "CaptureDevice.swift:ensureControllerLoaded",
-                    "message": "before mainactor run",
-                    "data": [
-                        "deviceName": self.name
-                    ],
-                    "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                ])
-                if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                   let fh = fopen(path, "a") {
-                    logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
-                    _ = fwrite("\n", 1, 1, fh)
-                    fclose(fh)
-                }
-            } catch {}
-            // #endregion
-
-            // #region agent log
-            do {
-                let logLine = try JSONSerialization.data(withJSONObject: [
-                    "sessionId": "debug-session",
-                    "runId": "run8",
-                    "hypothesisId": "H1",
-                    "location": "CaptureDevice.swift:ensureControllerLoaded",
-                    "message": "attempt uvc init (background)",
-                    "data": [
-                        "deviceName": self.name
-                    ],
-                    "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                ])
-                if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                   let fh = fopen(path, "a") {
-                    logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
-                    _ = fwrite("\n", 1, 1, fh)
-                    fclose(fh)
-                }
-            } catch {}
-            // #endregion
-
-            var hasUVC = false
             var dc: DeviceController?
             var errorMsg: String?
+            autoreleasepool {
+                var objcError: NSString?
+                let uvcAny = CCObjCTryCatch({
+                    return (try? UVCDevice(device: avDevice)) as AnyObject?
+                }, &objcError)
 
-            do {
-                // Create UVC and controller on MainActor to avoid cross-thread issues.
-                try await MainActor.run {
-                    // #region agent log
-                    do {
-                        let logLine = try JSONSerialization.data(withJSONObject: [
-                            "sessionId": "debug-session",
-                            "runId": "run8",
-                            "hypothesisId": "H1",
-                            "location": "CaptureDevice.swift:ensureControllerLoaded",
-                            "message": "enter main actor before uvc init",
-                            "data": [
-                                "deviceName": self.name
-                            ],
-                            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                        ])
-                        if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                           let fh = fopen(path, "a") {
-                            logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
-                            _ = fwrite("\n", 1, 1, fh)
-                            fclose(fh)
-                        }
-                    } catch {}
-                    // #endregion
-
-                    // UVC init with ObjC exception guard
-                    var objcError: NSString?
-                    let uvcAny = CCObjCTryCatch({
-                        return (try? UVCDevice(device: avDevice)) as AnyObject?
-                    }, &objcError)
-                    let uvc = uvcAny as? UVCDevice
-                    if let objcError {
-                        errorMsg = "NSException: \(objcError)"
-                    }
-                    hasUVC = uvc != nil
-
-                    // #region agent log
-                    do {
-                        let logLine = try JSONSerialization.data(withJSONObject: [
-                            "sessionId": "debug-session",
-                            "runId": "run8",
-                            "hypothesisId": "H1",
-                            "location": "CaptureDevice.swift:ensureControllerLoaded",
-                            "message": "after uvc init",
-                            "data": [
-                                "deviceName": self.name,
-                                "hasUVC": hasUVC,
-                                "objcError": objcError as String? ?? ""
-                            ],
-                            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                        ])
-                        if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                           let fh = fopen(path, "a") {
-                            logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
-                            _ = fwrite("\n", 1, 1, fh)
-                            fclose(fh)
-                        }
-                    } catch {}
-                    // #endregion
-
-                    guard hasUVC else {
-                        self.controllerState = .failed(errorMsg ?? "UVC init returned nil device.")
-                        return
-                    }
-
-                    // DeviceController init
-                    dc = DeviceController(properties: uvc?.properties)
-
-                    // #region agent log
-                    do {
-                        let logLine = try JSONSerialization.data(withJSONObject: [
-                            "sessionId": "debug-session",
-                            "runId": "run8",
-                            "hypothesisId": "H1",
-                            "location": "CaptureDevice.swift:ensureControllerLoaded",
-                            "message": "after dc init",
-                            "data": [
-                                "deviceName": self.name,
-                                "hasDC": dc != nil
-                            ],
-                            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                        ])
-                        if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                           let fh = fopen(path, "a") {
-                            logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
-                            _ = fwrite("\n", 1, 1, fh)
-                            fclose(fh)
-                        }
-                    } catch {}
-                    // #endregion
+                let uvc = uvcAny as? UVCDevice
+                if let objcError {
+                    errorMsg = "NSException: \(objcError)"
                 }
-            } catch {
-                errorMsg = "\(error)"
+                if uvc == nil {
+                    errorMsg = errorMsg ?? "UVC init returned nil device."
+                }
+
+                dc = DeviceController(properties: uvc?.properties)
+                if dc == nil, errorMsg == nil {
+                    errorMsg = "Unable to initialize camera controls."
+                }
             }
 
             await MainActor.run {
-                // #region agent log
-                do {
-                    let logLine = try JSONSerialization.data(withJSONObject: [
-                        "sessionId": "debug-session",
-                        "runId": "run8",
-                        "hypothesisId": "H1",
-                        "location": "CaptureDevice.swift:ensureControllerLoaded",
-                        "message": "controller creation result",
-                        "data": [
-                            "hasDC": dc != nil,
-                            "hasUVC": hasUVC,
-                            "error": errorMsg as Any,
-                            "deviceName": self.name
-                        ],
-                        "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                    ])
-                    if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8) {
-                        if let fh = fopen(path, "a") {
-                            logLine.withUnsafeBytes { ptr in
-                                _ = fwrite(ptr.baseAddress, 1, logLine.count, fh)
-                            }
-                            _ = fwrite("\n", 1, 1, fh)
-                            fclose(fh)
-                        }
-                    }
-                } catch {}
-                // #endregion
-                if let dc {
-                    self.controller = dc
+                let dcResult = dc
+                let errorResult = errorMsg
+                guard self.controllerLoadGeneration == gen else { return }
+                if let dcResult {
+                    self.controller = dcResult
                     self.controllerState = .loaded
                 } else {
-                    self.controllerState = .failed(errorMsg ?? "Unable to initialize camera controls.")
+                    self.controllerState = .failed(errorResult)
                 }
                 self.controllerTask = nil
             }

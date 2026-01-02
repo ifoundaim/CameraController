@@ -34,85 +34,91 @@ struct SettingsView: View {
 
     @ViewBuilder
     private func contentWithController() -> some View {
-        let _ = captureDevice?.ensureControllerLoaded()
+        Group {
+            if let device = captureDevice {
+                // #region agent log
+                let _ = {
+                    do {
+                        let payload: [String: Any] = [
+                            "sessionId": "debug-session",
+                            "runId": "run8",
+                            "hypothesisId": "H1",
+                            "location": "SettingsView.swift:contentWithController",
+                            "message": "render contentWithController",
+                            "data": [
+                                "currentSection": currentSection as Any,
+                                "state": "\(device.controllerState)"
+                            ],
+                            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+                        ]
 
-        if let device = captureDevice {
-            // #region agent log
-            let _ = {
-                do {
-                    let payload: [String: Any] = [
-                        "sessionId": "debug-session",
-                        "runId": "run8",
-                        "hypothesisId": "H1",
-                        "location": "SettingsView.swift:contentWithController",
-                        "message": "render contentWithController",
-                        "data": [
-                            "currentSection": currentSection as Any,
-                            "state": "\(device.controllerState)"
-                        ],
-                        "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                    ]
-
-                    guard JSONSerialization.isValidJSONObject(payload) else {
-                        if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                           let fh = fopen(path, "a") {
-                            let fallback = """
+                        guard JSONSerialization.isValidJSONObject(payload) else {
+                            if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
+                               let fh = fopen(path, "a") {
+                                let fallback = """
 {"sessionId":"debug-session","runId":"run8","hypothesisId":"H1","location":"SettingsView.swift:contentWithController","message":"invalid json payload","data":{"currentSectionType":"\(String(describing: type(of: currentSection)))"},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
 """
-                            fallback.withCString { ptr in
-                                _ = fwrite(ptr, 1, strlen(ptr), fh)
-                                _ = fwrite("\n", 1, 1, fh)
+                                fallback.withCString { ptr in
+                                    _ = fwrite(ptr, 1, strlen(ptr), fh)
+                                    _ = fwrite("\n", 1, 1, fh)
+                                }
+                                fclose(fh)
                             }
+                            return 0
+                        }
+
+                        let logLine = try JSONSerialization.data(withJSONObject: payload)
+                        if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
+                           let fh = fopen(path, "a") {
+                            logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
+                            _ = fwrite("\n", 1, 1, fh)
                             fclose(fh)
                         }
-                        return 0
-                    }
+                    } catch {}
+                    return 0
+                }()
+                // #endregion
 
-                    let logLine = try JSONSerialization.data(withJSONObject: payload)
-                    if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                       let fh = fopen(path, "a") {
-                        logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
-                        _ = fwrite("\n", 1, 1, fh)
-                        fclose(fh)
+                switch device.controllerState {
+                case .loaded:
+                    if let controller = device.controller {
+                        if currentSection == 0 {
+                            BasicSettings(controller: controller)
+                        } else if currentSection == 1 {
+                            AdvancedView(controller: controller)
+                        } else if currentSection == 2 {
+                            ProfilesView()
+                        }
+                    } else {
+                        loadingView(text: "Loading device…")
                     }
-                } catch {}
-                return 0
-            }()
-            // #endregion
-            switch device.controllerState {
-            case .loaded:
-                if let controller = device.controller {
-                    if currentSection == 0 {
-                        BasicSettings(controller: controller)
-                    } else if currentSection == 1 {
-                        AdvancedView(controller: controller)
-                    } else if currentSection == 2 {
-                        ProfilesView()
-                    }
-                } else {
+                case .loading, .idle:
                     loadingView(text: "Loading device…")
-                }
-            case .loading, .idle:
-                loadingView(text: "Loading device…")
-            case .failed(let message):
-                VStack(spacing: 12) {
-                    Text("Unable to load camera controls.")
-                        .font(.headline)
-                    if let message, !message.isEmpty {
-                        Text(message)
-                            .font(.subheadline)
+                case .failed(let message):
+                    VStack(spacing: 12) {
+                        Text("Unable to load camera controls.")
+                            .font(.headline)
+                        if let message, !message.isEmpty {
+                            Text(message)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        Text("Try reconnecting the camera or selecting a different device.")
+                            .font(.footnote)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                     }
-                    Text("Try reconnecting the camera or selecting a different device.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                loadingView(text: "No camera selected.")
             }
-        } else {
-            loadingView(text: "No camera selected.")
+        }
+        .task(id: captureDevice?.avDevice?.uniqueID) {
+            await MainActor.run {
+                captureDevice?.ensureControllerLoaded()
+            }
         }
     }
 
