@@ -16,6 +16,7 @@ func CCObjCTryCatch(_ block: @escaping @convention(block) () -> AnyObject?, _ er
 
 final class CaptureDevice: Hashable, ObservableObject {
     let name: String
+    let uniqueID: String
     let avDevice: AVCaptureDevice?
     @Published var controller: DeviceController?
     @Published var controllerState: ControllerState = .idle
@@ -32,14 +33,22 @@ final class CaptureDevice: Hashable, ObservableObject {
     init(avDevice: AVCaptureDevice) {
         self.avDevice = avDevice
         self.name = avDevice.localizedName
+        self.uniqueID = avDevice.uniqueID
     }
 
     static func == (lhs: CaptureDevice, rhs: CaptureDevice) -> Bool {
-        return lhs.avDevice == rhs.avDevice
+        return lhs.uniqueID == rhs.uniqueID
     }
 
     func hash(into hasher: inout Hasher) {
-        hasher.combine(avDevice)
+        hasher.combine(uniqueID)
+    }
+
+    /// Convenience initializer for tests / previews when no `AVCaptureDevice` exists.
+    init(name: String, uniqueID: String) {
+        self.avDevice = nil
+        self.name = name
+        self.uniqueID = uniqueID
     }
 
     func isConfigurable() -> Bool {
@@ -85,9 +94,10 @@ final class CaptureDevice: Hashable, ObservableObject {
 
         // Watchdog: if UVC init blocks indefinitely, fail the UI after 3s.
         Task.detached { [weak self] in
+            let weakSelf = self
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             await MainActor.run {
-                guard let self else { return }
+                guard let self = weakSelf else { return }
                 guard self.controllerLoadGeneration == gen else { return }
                 guard self.controller == nil else { return }
                 guard case .loading = self.controllerState else { return }
@@ -125,9 +135,9 @@ final class CaptureDevice: Hashable, ObservableObject {
                 }
             }
 
+            let dcResult = dc
+            let errorResult = errorMsg
             await MainActor.run {
-                let dcResult = dc
-                let errorResult = errorMsg
                 guard self.controllerLoadGeneration == gen else { return }
                 if let dcResult {
                     self.controller = dcResult

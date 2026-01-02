@@ -80,4 +80,12 @@ class DevicesManagerTests: XCTestCase {
         XCTAssertEqual(deviceManager.devices, [CaptureDevice(avDevice: device)])
     }
 
+    func testCaptureDeviceIdentityIsStableByUniqueID() throws {
+        let a = CaptureDevice(name: "A", uniqueID: "same-id")
+        let b = CaptureDevice(name: "B", uniqueID: "same-id")
+
+        XCTAssertEqual(a, b)
+        XCTAssertEqual(Set([a, b]).count, 1)
+    }
+
 }

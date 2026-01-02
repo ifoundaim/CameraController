@@ -20,7 +20,7 @@ final class DevicesManager: ObservableObject {
     @Published var selectedDevice: CaptureDevice? {
         willSet {
             if newValue != nil && selectedDevice != newValue {
-                UserSettings.shared.lastSelectedDevice = newValue?.avDevice?.uniqueID
+                UserSettings.shared.lastSelectedDevice = newValue?.uniqueID
             }
             deviceMonitor.updateDevice(newValue)
         }
@@ -35,7 +35,7 @@ final class DevicesManager: ObservableObject {
         })
 
         if let deviceId = UserSettings.shared.lastSelectedDevice,
-           let saved = devices.first(where: { $0.avDevice?.uniqueID == deviceId }) {
+           let saved = devices.first(where: { $0.uniqueID == deviceId }) {
             selectedDevice = saved
         } else {
             selectedDevice = devices.first
@@ -57,11 +57,19 @@ final class DevicesManager: ObservableObject {
         NotificationCenter.default.removeObserver(self,
                                                   name: NSNotification.Name.AVCaptureDeviceWasConnected,
                                                   object: nil)
+        NotificationCenter.default.removeObserver(self,
+                                                  name: NSNotification.Name.AVCaptureDeviceWasDisconnected,
+                                                  object: nil)
     }
 
     @objc
     func deviceAdded(notif: NSNotification) {
         guard let device = notif.object as? AVCaptureDevice else {
+            return
+        }
+
+        // Avoid duplicates (same physical camera can trigger multiple connect notifications).
+        guard !devices.contains(where: { $0.uniqueID == device.uniqueID }) else {
             return
         }
 
@@ -85,7 +93,7 @@ final class DevicesManager: ObservableObject {
 
         devices.remove(at: index!)
 
-        if device.uniqueID == selectedDevice?.avDevice?.uniqueID {
+        if device.uniqueID == selectedDevice?.uniqueID {
             selectedDevice = nil
         }
         NotificationCenter.default.post(name: .devicesUpdated, object: nil)

@@ -18,7 +18,14 @@ struct SettingsView: View {
             .padding(.horizontal, Constants.Style.padding)
             .padding(.bottom, Constants.Style.padding)
             .transition(.opacity.animation(.easeOut(duration: 0.25)))
-            .id(currentSection)
+            // Avoid forcing a full rebuild on every tab switch; it can restart tasks and
+            // accidentally re-trigger loading UI even when the device hasn't changed.
+            .onChange(of: currentSection) { newValue in
+                guard let newValue, newValue != 3 else { return } // not Preferences
+                Task { @MainActor in
+                    captureDevice?.ensureControllerLoaded()
+                }
+            }
     }
 
     @ViewBuilder
@@ -36,49 +43,6 @@ struct SettingsView: View {
     private func contentWithController() -> some View {
         Group {
             if let device = captureDevice {
-                // #region agent log
-                let _ = {
-                    do {
-                        let payload: [String: Any] = [
-                            "sessionId": "debug-session",
-                            "runId": "run8",
-                            "hypothesisId": "H1",
-                            "location": "SettingsView.swift:contentWithController",
-                            "message": "render contentWithController",
-                            "data": [
-                                "currentSection": currentSection as Any,
-                                "state": "\(device.controllerState)"
-                            ],
-                            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                        ]
-
-                        guard JSONSerialization.isValidJSONObject(payload) else {
-                            if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                               let fh = fopen(path, "a") {
-                                let fallback = """
-{"sessionId":"debug-session","runId":"run8","hypothesisId":"H1","location":"SettingsView.swift:contentWithController","message":"invalid json payload","data":{"currentSectionType":"\(String(describing: type(of: currentSection)))"},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
-"""
-                                fallback.withCString { ptr in
-                                    _ = fwrite(ptr, 1, strlen(ptr), fh)
-                                    _ = fwrite("\n", 1, 1, fh)
-                                }
-                                fclose(fh)
-                            }
-                            return 0
-                        }
-
-                        let logLine = try JSONSerialization.data(withJSONObject: payload)
-                        if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                           let fh = fopen(path, "a") {
-                            logLine.withUnsafeBytes { ptr in _ = fwrite(ptr.baseAddress, 1, logLine.count, fh) }
-                            _ = fwrite("\n", 1, 1, fh)
-                            fclose(fh)
-                        }
-                    } catch {}
-                    return 0
-                }()
-                // #endregion
-
                 switch device.controllerState {
                 case .loaded:
                     if let controller = device.controller {
@@ -115,10 +79,8 @@ struct SettingsView: View {
                 loadingView(text: "No camera selected.")
             }
         }
-        .task(id: captureDevice?.avDevice?.uniqueID) {
-            await MainActor.run {
-                captureDevice?.ensureControllerLoaded()
-            }
+        .task(id: captureDevice?.uniqueID) {
+            await MainActor.run { captureDevice?.ensureControllerLoaded() }
         }
     }
 
@@ -129,51 +91,6 @@ struct SettingsView: View {
             Text(text)
                 .font(.footnote)
                 .foregroundColor(.secondary)
-            // #region agent log
-            let _ = {
-                do {
-                    let payload: [String: Any] = [
-                        "sessionId": "debug-session",
-                        "runId": "run8",
-                        "hypothesisId": "H1",
-                        "location": "SettingsView.swift:loadingView",
-                        "message": "showing loading view",
-                        "data": [
-                            "text": text,
-                            "deviceState": "\(captureDevice?.controllerState ?? .idle)"
-                        ],
-                        "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-                    ]
-
-                    guard JSONSerialization.isValidJSONObject(payload) else {
-                        if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8),
-                           let fh = fopen(path, "a") {
-                            let fallback = """
-{"sessionId":"debug-session","runId":"run8","hypothesisId":"H1","location":"SettingsView.swift:loadingView","message":"invalid json payload","data":{"textType":"\(String(describing: type(of: text)))","deviceStateType":"\(String(describing: type(of: captureDevice?.controllerState)))"},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
-"""
-                            fallback.withCString { ptr in
-                                _ = fwrite(ptr, 1, strlen(ptr), fh)
-                                _ = fwrite("\n", 1, 1, fh)
-                            }
-                            fclose(fh)
-                        }
-                        return 0
-                    }
-
-                    let logLine = try JSONSerialization.data(withJSONObject: payload)
-                    if let path = "/Users/matthewreese/CameraController-1/.cursor/debug.log".cString(using: .utf8) {
-                        if let fh = fopen(path, "a") {
-                            logLine.withUnsafeBytes { ptr in
-                                _ = fwrite(ptr.baseAddress, 1, logLine.count, fh)
-                            }
-                            _ = fwrite("\n", 1, 1, fh)
-                            fclose(fh)
-                        }
-                    }
-                } catch {}
-                return 0
-            }()
-            // #endregion
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
