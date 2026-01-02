@@ -92,6 +92,19 @@ final class CaptureDevice: Hashable, ObservableObject {
         controllerLoadGeneration &+= 1
         let gen = controllerLoadGeneration
 
+        // #region agent log
+        do {
+            if let fh = fopen("/Users/matthewreese/CameraController-1/.cursor/debug.log", "a") {
+                let payload = """
+{"sessionId":"debug-session","runId":"run9","hypothesisId":"H1","location":"CaptureDevice.ensureControllerLoaded","message":"start","data":{"uniqueID":"\(uniqueID)","gen":\(gen)},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
+"""
+                payload.withCString { ptr in _ = fwrite(ptr, 1, strlen(ptr), fh) }
+                _ = fwrite("\n", 1, 1, fh)
+                fclose(fh)
+            }
+        }
+        // #endregion
+
         // Watchdog: if UVC init blocks indefinitely, fail the UI after 3s.
         Task.detached { [weak self] in
             let weakSelf = self
@@ -107,6 +120,19 @@ final class CaptureDevice: Hashable, ObservableObject {
                 self.controllerLoadGeneration &+= 1
                 self.controllerTask?.cancel()
                 self.controllerTask = nil
+
+                // #region agent log
+                do {
+                    if let fh = fopen("/Users/matthewreese/CameraController-1/.cursor/debug.log", "a") {
+                        let payload = """
+{"sessionId":"debug-session","runId":"run9","hypothesisId":"H1","location":"CaptureDevice.ensureControllerLoaded","message":"watchdog_timeout","data":{"uniqueID":"\(self.uniqueID)","gen":\(gen)},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
+"""
+                        payload.withCString { ptr in _ = fwrite(ptr, 1, strlen(ptr), fh) }
+                        _ = fwrite("\n", 1, 1, fh)
+                        fclose(fh)
+                    }
+                }
+                // #endregion
             }
         }
 
@@ -146,6 +172,19 @@ final class CaptureDevice: Hashable, ObservableObject {
                     self.controllerState = .failed(errorResult)
                 }
                 self.controllerTask = nil
+
+                // #region agent log
+                do {
+                    if let fh = fopen("/Users/matthewreese/CameraController-1/.cursor/debug.log", "a") {
+                        let payload = """
+{"sessionId":"debug-session","runId":"run9","hypothesisId":"H1","location":"CaptureDevice.ensureControllerLoaded","message":"complete","data":{"uniqueID":"\(self.uniqueID)","gen":\(gen),"result":"\(dcResult != nil ? "loaded" : "failed")","error":"\(errorResult ?? "")"},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
+"""
+                        payload.withCString { ptr in _ = fwrite(ptr, 1, strlen(ptr), fh) }
+                        _ = fwrite("\n", 1, 1, fh)
+                        fclose(fh)
+                    }
+                }
+                // #endregion
             }
         }
     }

@@ -43,6 +43,19 @@ struct SettingsView: View {
     private func contentWithController() -> some View {
         Group {
             if let device = captureDevice {
+                // #region agent log
+                do {
+                    if let fh = fopen("/Users/matthewreese/CameraController-1/.cursor/debug.log", "a") {
+                        let payload = """
+{"sessionId":"debug-session","runId":"run9","hypothesisId":"H3","location":"SettingsView.contentWithController","message":"render","data":{"uniqueID":"\(device.uniqueID)","state":"\(device.controllerState)","controllerNil":\(device.controller == nil),"section":\(currentSection ?? -1)},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
+"""
+                        payload.withCString { ptr in _ = fwrite(ptr, 1, strlen(ptr), fh) }
+                        _ = fwrite("\n", 1, 1, fh)
+                        fclose(fh)
+                    }
+                }
+                // #endregion
+
                 switch device.controllerState {
                 case .loaded:
                     if let controller = device.controller {
@@ -80,6 +93,18 @@ struct SettingsView: View {
             }
         }
         .task(id: captureDevice?.uniqueID) {
+            // #region agent log
+            do {
+                if let fh = fopen("/Users/matthewreese/CameraController-1/.cursor/debug.log", "a") {
+                    let payload = """
+{"sessionId":"debug-session","runId":"run9","hypothesisId":"H4","location":"SettingsView.task","message":"ensureControllerLoaded_task","data":{"uniqueID":"\(captureDevice?.uniqueID ?? "nil")"},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
+"""
+                    payload.withCString { ptr in _ = fwrite(ptr, 1, strlen(ptr), fh) }
+                    _ = fwrite("\n", 1, 1, fh)
+                    fclose(fh)
+                }
+            }
+            // #endregion
             await MainActor.run { captureDevice?.ensureControllerLoaded() }
         }
     }
@@ -91,6 +116,18 @@ struct SettingsView: View {
             Text(text)
                 .font(.footnote)
                 .foregroundColor(.secondary)
+            // #region agent log
+            do {
+                if let fh = fopen("/Users/matthewreese/CameraController-1/.cursor/debug.log", "a") {
+                    let payload = """
+{"sessionId":"debug-session","runId":"run9","hypothesisId":"H3","location":"SettingsView.loadingView","message":"show_loading","data":{"text":"\(text)","deviceState":"\(captureDevice?.controllerState ?? .idle)","uniqueID":"\(captureDevice?.uniqueID ?? "nil")"},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
+"""
+                    payload.withCString { ptr in _ = fwrite(ptr, 1, strlen(ptr), fh) }
+                    _ = fwrite("\n", 1, 1, fh)
+                    fclose(fh)
+                }
+            }
+            // #endregion
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

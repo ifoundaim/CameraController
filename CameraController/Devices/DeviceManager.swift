@@ -23,6 +23,19 @@ final class DevicesManager: ObservableObject {
                 UserSettings.shared.lastSelectedDevice = newValue?.uniqueID
             }
             deviceMonitor.updateDevice(newValue)
+
+            // #region agent log
+            do {
+                if let fh = fopen("/Users/matthewreese/CameraController-1/.cursor/debug.log", "a") {
+                    let payload = """
+{"sessionId":"debug-session","runId":"run9","hypothesisId":"H2","location":"DevicesManager.selectedDevice","message":"willSet","data":{"old":"\(selectedDevice?.uniqueID ?? "nil")","new":"\(newValue?.uniqueID ?? "nil")"},"timestamp":\(Int(Date().timeIntervalSince1970 * 1000))}
+"""
+                    payload.withCString { ptr in _ = fwrite(ptr, 1, strlen(ptr), fh) }
+                    _ = fwrite("\n", 1, 1, fh)
+                    fclose(fh)
+                }
+            }
+            // #endregion
         }
     }
 
