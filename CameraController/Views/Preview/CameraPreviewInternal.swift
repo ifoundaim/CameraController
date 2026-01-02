@@ -52,6 +52,10 @@ final class CameraPreviewInternal: NSView {
                                                selector: #selector(resumePreview),
                                                name: .resumePreview,
                                                object: nil)
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(teardownPreviewNotification),
+                                               name: .teardownPreview,
+                                               object: nil)
     }
 
     private func setupPreviewLayer(_ captureSession: AVCaptureSession) {
@@ -82,6 +86,14 @@ final class CameraPreviewInternal: NSView {
     func stopRunning() {
         if captureSession.isRunning {
             captureSession.stopRunning()
+        }
+    }
+
+    func teardown() {
+        stopRunning()
+        if let input = captureInput {
+            captureSession.removeInput(input)
+            captureInput = nil
         }
     }
 
@@ -150,6 +162,11 @@ final class CameraPreviewInternal: NSView {
         if !captureSession.isRunning {
             captureSession.startRunning()
         }
+    }
+
+    @objc
+    func teardownPreviewNotification() {
+        teardown()
     }
 }
 

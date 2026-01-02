@@ -14,4 +14,5 @@ extension NSNotification.Name {
     static let windowClose = NSNotification.Name(rawValue: "WindowClose")
     static let pausePreview = NSNotification.Name(rawValue: "PausePreview")
     static let resumePreview = NSNotification.Name(rawValue: "ResumePreview")
+    static let teardownPreview = NSNotification.Name(rawValue: "TeardownPreview")
 }

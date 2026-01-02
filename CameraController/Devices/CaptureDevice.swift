@@ -159,6 +159,9 @@ final class CaptureDevice: Hashable, ObservableObject {
             ]
         )
 
+        // Teardown preview to give exclusive access to UVC (will be resumed after attempt).
+        NotificationCenter.default.post(name: .teardownPreview, object: nil)
+
         // Watchdog to avoid indefinite hangs (1.5s).
         Task.detached { [weak self] in
             let weakSelf = self
