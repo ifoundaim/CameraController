@@ -159,6 +159,32 @@ final class CaptureDevice: Hashable, ObservableObject {
             ]
         )
 
+        // Watchdog to avoid indefinite hangs (1.5s).
+        Task.detached { [weak self] in
+            let weakSelf = self
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            await MainActor.run {
+                guard let self = weakSelf else { return }
+                guard self.controllerLoadGeneration == gen else { return }
+                guard self.controller == nil else { return }
+                guard case .loading = self.controllerState else { return }
+
+                self.controllerState = .failed("UVC init watchdog timed out (~1.5s).")
+                self.controllerLoadGeneration &+= 1
+                self.controllerTask?.cancel()
+                self.controllerTask = nil
+                self.appendDebugLog(
+                    hypothesisId: "H1",
+                    location: "CaptureDevice.ensureControllerLoaded",
+                    message: "watchdog_timeout_1_5s",
+                    data: [
+                        "uniqueID": self.uniqueID,
+                        "gen": "\(gen)"
+                    ]
+                )
+            }
+        }
+
         enum UVCInitOutcome {
             case success(dc: DeviceController?, error: String?, elapsedMs: String)
             case timeout(elapsedMs: String)
@@ -166,6 +192,16 @@ final class CaptureDevice: Hashable, ObservableObject {
 
         controllerTask = Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
+
+            self.appendDebugLog(
+                hypothesisId: "H1",
+                location: "CaptureDevice.ensureControllerLoaded",
+                message: "task_created",
+                data: [
+                    "uniqueID": self.uniqueID,
+                    "gen": "\(gen)"
+                ]
+            )
 
             let outcome: UVCInitOutcome = await withTaskGroup(of: UVCInitOutcome.self) { group in
                 // UVC init attempt
@@ -255,7 +291,6 @@ final class CaptureDevice: Hashable, ObservableObject {
                         ]
                     )
                 case .timeout(let elapsedMs):
-                    // Fail fast and prevent immediate retries (state is failed; ensureControllerLoaded early-returns on failed)
                     self.controllerState = .failed("UVC init timed out (~\(elapsedMs) ms).")
                     self.controllerLoadGeneration &+= 1
                     self.appendDebugLog(
@@ -269,6 +304,23 @@ final class CaptureDevice: Hashable, ObservableObject {
                         ]
                     )
                 }
+
+                self.appendDebugLog(
+                    hypothesisId: "H1",
+                    location: "CaptureDevice.ensureControllerLoaded",
+                    message: "task_complete",
+                    data: [
+                        "uniqueID": self.uniqueID,
+                        "gen": "\(gen)",
+                        "outcome": {
+                            switch outcome {
+                            case .success: return "success"
+                            case .timeout: return "timeout"
+                            }
+                        }(),
+                        "state": "\(self.controllerState)"
+                    ]
+                )
             }
         }
     }
