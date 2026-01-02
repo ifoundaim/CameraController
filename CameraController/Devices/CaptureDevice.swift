@@ -120,6 +120,18 @@ final class CaptureDevice: Hashable, ObservableObject {
             )
             return
         }
+        if case .failed = controllerState {
+            appendDebugLog(
+                hypothesisId: "H1",
+                location: "CaptureDevice.ensureControllerLoaded",
+                message: "early_return_already_failed",
+                data: [
+                    "uniqueID": uniqueID,
+                    "state": "\(controllerState)"
+                ]
+            )
+            return
+        }
         guard let avDevice else {
             appendDebugLog(
                 hypothesisId: "H1",
@@ -147,105 +159,116 @@ final class CaptureDevice: Hashable, ObservableObject {
             ]
         )
 
-        // Watchdog: if UVC init blocks indefinitely, fail the UI after 3s.
-        Task.detached { [weak self] in
-            let weakSelf = self
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            await MainActor.run {
-                guard let self = weakSelf else { return }
-                guard self.controllerLoadGeneration == gen else { return }
-                guard self.controller == nil else { return }
-                guard case .loading = self.controllerState else { return }
-
-                self.controllerState = .failed("UVC init timed out (> 3s).")
-                // Invalidate this generation so any late completion is ignored.
-                self.controllerLoadGeneration &+= 1
-                self.controllerTask?.cancel()
-                self.controllerTask = nil
-                self.appendDebugLog(
-                    hypothesisId: "H1",
-                    location: "CaptureDevice.ensureControllerLoaded",
-                    message: "watchdog_timeout",
-                    data: [
-                        "uniqueID": self.uniqueID,
-                        "gen": "\(gen)"
-                    ]
-                )
-            }
+        enum UVCInitOutcome {
+            case success(dc: DeviceController?, error: String?, elapsedMs: String)
+            case timeout(elapsedMs: String)
         }
 
         controllerTask = Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
 
-            let startNs = DispatchTime.now().uptimeNanoseconds
-            var dc: DeviceController?
-            var errorMsg: String?
-            autoreleasepool {
-                self.appendDebugLog(
-                    hypothesisId: "H1",
-                    location: "CaptureDevice.ensureControllerLoaded",
-                    message: "uvc_init_begin",
-                    data: [
-                        "uniqueID": self.uniqueID,
-                        "gen": "\(gen)"
-                    ]
-                )
+            let outcome: UVCInitOutcome = await withTaskGroup(of: UVCInitOutcome.self) { group in
+                // UVC init attempt
+                group.addTask {
+                    let startNs = DispatchTime.now().uptimeNanoseconds
+                    var dc: DeviceController?
+                    var errorMsg: String?
+                    autoreleasepool {
+                        self.appendDebugLog(
+                            hypothesisId: "H1",
+                            location: "CaptureDevice.ensureControllerLoaded",
+                            message: "uvc_init_begin",
+                            data: [
+                                "uniqueID": self.uniqueID,
+                                "gen": "\(gen)"
+                            ]
+                        )
 
-                var objcError: NSString?
-                let uvcAny = CCObjCTryCatch({
-                    return (try? UVCDevice(device: avDevice)) as AnyObject?
-                }, &objcError)
+                        var objcError: NSString?
+                        let uvcAny = CCObjCTryCatch({
+                            return (try? UVCDevice(device: avDevice)) as AnyObject?
+                        }, &objcError)
 
-                let uvc = uvcAny as? UVCDevice
-                if let objcError {
-                    errorMsg = "NSException: \(objcError)"
+                        let uvc = uvcAny as? UVCDevice
+                        if let objcError {
+                            errorMsg = "NSException: \(objcError)"
+                        }
+                        if uvc == nil {
+                            errorMsg = errorMsg ?? "UVC init returned nil device."
+                        }
+
+                        dc = DeviceController(properties: uvc?.properties)
+                        if dc == nil, errorMsg == nil {
+                            errorMsg = "Unable to initialize camera controls."
+                        }
+                    }
+
+                    let elapsedMs = (Double(DispatchTime.now().uptimeNanoseconds - startNs) / 1_000_000)
+                    let elapsedStr = String(format: "%.1f", elapsedMs)
+                    self.appendDebugLog(
+                        hypothesisId: "H1",
+                        location: "CaptureDevice.ensureControllerLoaded",
+                        message: "uvc_init_end",
+                        data: [
+                            "uniqueID": self.uniqueID,
+                            "gen": "\(gen)",
+                            "uvcNil": "\(dc == nil)",
+                            "error": errorMsg ?? "",
+                            "elapsedMs": elapsedStr
+                        ]
+                    )
+                    return .success(dc: dc, error: errorMsg, elapsedMs: elapsedStr)
                 }
-                if uvc == nil {
-                    errorMsg = errorMsg ?? "UVC init returned nil device."
+
+                // Timeout task (800ms)
+                group.addTask {
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                    return .timeout(elapsedMs: "800.0")
                 }
 
-                dc = DeviceController(properties: uvc?.properties)
-                if dc == nil, errorMsg == nil {
-                    errorMsg = "Unable to initialize camera controls."
-                }
-
-                let elapsedMs = (Double(DispatchTime.now().uptimeNanoseconds - startNs) / 1_000_000).formatted(.number.precision(.fractionLength(1)))
-                self.appendDebugLog(
-                    hypothesisId: "H1",
-                    location: "CaptureDevice.ensureControllerLoaded",
-                    message: "uvc_init_end",
-                    data: [
-                        "uniqueID": self.uniqueID,
-                        "gen": "\(gen)",
-                        "uvcNil": "\(dc == nil)",
-                        "error": errorMsg ?? "",
-                        "elapsedMs": "\(elapsedMs)"
-                    ]
-                )
+                let first = await group.next() ?? .timeout(elapsedMs: "unknown")
+                group.cancelAll()
+                return first
             }
 
-            let dcResult = dc
-            let errorResult = errorMsg
             await MainActor.run {
                 guard self.controllerLoadGeneration == gen else { return }
-                if let dcResult {
-                    self.controller = dcResult
-                    self.controllerState = .loaded
-                } else {
-                    self.controllerState = .failed(errorResult)
-                }
                 self.controllerTask = nil
-                self.appendDebugLog(
-                    hypothesisId: "H1",
-                    location: "CaptureDevice.ensureControllerLoaded",
-                    message: "complete",
-                    data: [
-                        "uniqueID": self.uniqueID,
-                        "gen": "\(gen)",
-                        "result": dcResult != nil ? "loaded" : "failed",
-                        "error": errorResult ?? ""
-                    ]
-                )
+
+                switch outcome {
+                case .success(let dcResult, let errorResult, _):
+                    if let dcResult {
+                        self.controller = dcResult
+                        self.controllerState = .loaded
+                    } else {
+                        self.controllerState = .failed(errorResult)
+                    }
+                    self.appendDebugLog(
+                        hypothesisId: "H1",
+                        location: "CaptureDevice.ensureControllerLoaded",
+                        message: "complete",
+                        data: [
+                            "uniqueID": self.uniqueID,
+                            "gen": "\(gen)",
+                            "result": dcResult != nil ? "loaded" : "failed",
+                            "error": errorResult ?? ""
+                        ]
+                    )
+                case .timeout(let elapsedMs):
+                    // Fail fast and prevent immediate retries (state is failed; ensureControllerLoaded early-returns on failed)
+                    self.controllerState = .failed("UVC init timed out (~\(elapsedMs) ms).")
+                    self.controllerLoadGeneration &+= 1
+                    self.appendDebugLog(
+                        hypothesisId: "H1",
+                        location: "CaptureDevice.ensureControllerLoaded",
+                        message: "uvc_init_timeout",
+                        data: [
+                            "uniqueID": self.uniqueID,
+                            "gen": "\(gen)",
+                            "elapsedMs": elapsedMs
+                        ]
+                    )
+                }
             }
         }
     }
